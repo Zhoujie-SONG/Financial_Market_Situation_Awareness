@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📈 股票智能分析系统
+# 📈 金融市场态势感知推理系统
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
