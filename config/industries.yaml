@@ -1,0 +1,123 @@
+# ============================================================
+# 行业深度分析模式 — 行业配置清单
+# ============================================================
+# 此配置文件用于行业深度分析模式 (--mode industry --industry <id>)。
+# 每个行业包含:
+#   id:        行业唯一标识（用于 CLI --industry 参数）
+#   name:      行业显示名称
+#   keywords:  用于新闻搜索的关键词列表
+#   index_code: 可选，行业指数代码
+#   stocks:    成分股列表
+#     code: 股票代码
+#     name: 股票名称
+#     role: 产业链角色（龙头/核心/上游/下游/弹性标的等）
+# ============================================================
+
+industries:
+  - id: "cpo"
+    name: "CPO 光模块"
+    keywords: ["CPO", "光模块", "硅光", "800G光模块", "共封装光学"]
+    index_code: ""
+    stocks:
+      - code: "300308"
+        name: "中际旭创"
+        role: "龙头"
+      - code: "300502"
+        name: "新易盛"
+        role: "核心"
+      - code: "300394"
+        name: "天孚通信"
+        role: "核心"
+      - code: "688498"
+        name: "源杰科技"
+        role: "上游（光芯片）"
+      - code: "300570"
+        name: "太辰光"
+        role: "核心"
+      - code: "301205"
+        name: "联特科技"
+        role: "弹性标的"
+
+  - id: "semiconductor_memory"
+    name: "半导体存储"
+    keywords: ["HBM", "DDR5", "NAND", "存储芯片", "半导体"]
+    index_code: ""
+    stocks:
+      - code: "002049"
+        name: "紫光国微"
+        role: "龙头"
+      - code: "300661"
+        name: "圣邦股份"
+        role: "核心（模拟芯片）"
+      - code: "688525"
+        name: "佰维存储"
+        role: "核心（存储模组）"
+      - code: "688981"
+        name: "中芯国际"
+        role: "核心（制造）"
+      - code: "002371"
+        name: "北方华创"
+        role: "核心（设备）"
+
+  - id: "ai_infrastructure"
+    name: "AI 算力基建"
+    keywords: ["AI算力", "GPU服务器", "液冷", "数据中心", "AI芯片"]
+    index_code: ""
+    stocks:
+      - code: "300308"
+        name: "中际旭创"
+        role: "龙头（光模块）"
+      - code: "688041"
+        name: "海光信息"
+        role: "龙头（AI芯片）"
+      - code: "603019"
+        name: "中科曙光"
+        role: "核心（算力服务器）"
+      - code: "000977"
+        name: "浪潮信息"
+        role: "核心（AI服务器）"
+      - code: "002837"
+        name: "英维克"
+        role: "核心（液冷散热）"
+
+  - id: "new_energy_vehicle"
+    name: "新能源汽车"
+    keywords: ["新能源汽车", "电动车", "锂电", "固态电池", "自动驾驶"]
+    index_code: ""
+    stocks:
+      - code: "002594"
+        name: "比亚迪"
+        role: "龙头（整车）"
+      - code: "300750"
+        name: "宁德时代"
+        role: "龙头（电池）"
+      - code: "601689"
+        name: "拓普集团"
+        role: "核心（零部件）"
+      - code: "002920"
+        name: "德赛西威"
+        role: "核心（智能座舱）"
+      - code: "688326"
+        name: "经纬恒润"
+        role: "核心（汽车电子）"
+
+  - id: "us_semiconductor_memory"
+    name: "美股存储行业"
+    keywords: ["semiconductor memory", "NAND", "DRAM", "HBM", "storage chip"]
+    index_code: ""
+    stocks:
+      - code: "MU"
+        name: "Micron Technology"
+        role: "龙头（DRAM/NAND）"
+      - code: "WDC"
+        name: "Western Digital"
+        role: "核心（HDD/SSD）"
+      - code: "STX"
+        name: "Seagate Technology"
+        role: "核心（HDD/SSD）"
+      - code: "MRVL"
+        name: "Marvell Technology"
+        role: "核心（存储控制器）"
+      - code: "SIMO"
+        name: "Silicon Motion"
+        role: "上游（SSD控制器）"

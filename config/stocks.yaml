@@ -1,0 +1,53 @@
+# ============================================================
+# 单股分析模式 — 自选股配置
+# ============================================================
+# 此配置文件用于单股分析模式 (--mode stock)。
+# 当 main.py 不带 --stocks 参数运行时，系统读取此列表进行分析。
+# 注: --stocks 命令行参数仍可覆盖此配置。
+#
+# 字段说明:
+#   code:   股票代码（A股纯数字/港股HK前缀/美股直接代码）
+#   name:   股票名称（仅用于标识）
+#   market: 市场标识 (cn/hk/us)
+# ============================================================
+
+stocks:
+  - code: "600519"
+    name: "贵州茅台"
+    market: "cn"
+
+  - code: "000001"
+    name: "平安银行"
+    market: "cn"
+
+  - code: "300308"
+    name: "中际旭创"
+    market: "cn"
+
+  - code: "300502"
+    name: "新易盛"
+    market: "cn"
+
+  - code: "002049"
+    name: "紫光国微"
+    market: "cn"
+
+  - code: "HK00700"
+    name: "腾讯控股"
+    market: "hk"
+
+  - code: "HK01810"
+    name: "小米集团"
+    market: "hk"
+
+  - code: "AAPL"
+    name: "Apple"
+    market: "us"
+
+  - code: "NVDA"
+    name: "NVIDIA"
+    market: "us"
+
+  - code: "TSLA"
+    name: "Tesla"
+    market: "us"

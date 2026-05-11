@@ -1,0 +1,110 @@
+# 🎯 {{ report_date }} {{ industry_name }} 行业深度分析
+> 分析时间: {{ timestamp }} | 成分股: {{ total_stocks }} 只 | 分析模式: Top-Down
+
+---
+
+## 1. 行业宏观动向
+
+{% if macro.sentiment_summary %}
+### 景气度判断
+**{{ macro.outlook_label }}** | {{ macro.sentiment_summary }}
+
+{% endif %}
+{% if macro.core_logic %}
+### 核心驱动逻辑
+{{ macro.core_logic }}
+{% endif %}
+
+{% if macro.key_events %}
+### 关键事件
+{% for event in macro.key_events %}
+- {{ event }}
+{% endfor %}
+{% endif %}
+
+{% if macro.policy_impact %}
+### 政策面影响
+{{ macro.policy_impact }}
+{% endif %}
+
+{% if macro.cycle_position %}
+### 周期位置
+{{ macro.cycle_position }}
+{% endif %}
+
+{% if macro.positive_catalysts %}
+### 积极催化因素
+{% for cat in macro.positive_catalysts %}
+- {{ cat }}
+{% endfor %}
+{% endif %}
+
+{% if macro.risk_factors %}
+### ⚠️ 风险因素
+{% for risk in macro.risk_factors %}
+- {{ risk }}
+{% endfor %}
+{% endif %}
+
+---
+
+## 2. 核心企业微观表现对比
+
+| 企业 | 角色 | 信号 | 评分 | 核心逻辑 |
+|------|------|------|------|----------|
+{% for s in stocks %}
+| **{{ s.name }}**({{ s.code }}) | {{ s.role }} | {{ s.signal_icon }} | {{ s.score }} | {{ s.summary[:80] }} |
+{% endfor %}
+
+### 统计概览
+| 指标 | 数值 |
+|------|------|
+| 成分股总数 | {{ total_stocks }} |
+| 看多信号 | {{ bullish_count }} 只 |
+| 看空信号 | {{ bearish_count }} 只 |
+| 中性信号 | {{ neutral_count }} 只 |
+| 成功率 | {{ success_count }}/{{ total_stocks }} |
+
+---
+
+## 3. 核心个股详情
+
+{% for s in stocks %}
+{% if s.detail %}
+### {{ s.name }} ({{ s.code }}) — {{ s.role }}
+{{ s.detail }}
+
+{% endif %}
+{% endfor %}
+
+---
+
+## 4. AI 综合投资策略
+
+{% if cio.chain_analysis %}
+### 产业链点评
+{{ cio.chain_analysis }}
+{% endif %}
+
+{% if cio.leader_analysis %}
+### 龙头企业深度分析
+{{ cio.leader_analysis }}
+{% endif %}
+
+{% if cio.allocation_advice %}
+### 配置建议
+{{ cio.allocation_advice }}
+{% endif %}
+
+{% if cio.risk_warning %}
+### ⚠️ 行业风险提示
+{{ cio.risk_warning }}
+{% endif %}
+
+{% if cio.comparative_insight %}
+### 横向对比洞察
+{{ cio.comparative_insight }}
+{% endif %}
+
+---
+*本报告由 AI 行业分析管线自动生成，仅供参考，不构成任何投资建议。*

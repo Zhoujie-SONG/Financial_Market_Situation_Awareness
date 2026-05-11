@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ industry_name }} 行业深度分析报告</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #f0f2f5; color: #1a1a2e; line-height: 1.7; padding: 20px;
+  }
+  .container { max-width: 960px; margin: 0 auto; }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    color: #fff; border-radius: 16px; padding: 40px; margin-bottom: 24px;
+    position: relative; overflow: hidden;
+  }
+  .header::after {
+    content: ''; position: absolute; top: -50%; right: -20%;
+    width: 400px; height: 400px; background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; position: relative; z-index: 1; }
+  .header .meta { font-size: 14px; opacity: 0.8; margin-bottom: 4px; position: relative; z-index: 1; }
+  .header .badge-row { margin-top: 16px; display: flex; gap: 10px; flex-wrap: wrap; position: relative; z-index: 1; }
+  .badge {
+    display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600;
+  }
+  .badge-bullish { background: #e8f5e9; color: #2e7d32; }
+  .badge-bearish { background: #fbe9e7; color: #c62828; }
+  .badge-neutral { background: #fff8e1; color: #f57f17; }
+  .badge-info { background: rgba(255,255,255,0.15); color: #fff; }
+
+  /* Section Card */
+  .section { background: #fff; border-radius: 12px; padding: 28px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .section-title {
+    font-size: 18px; font-weight: 700; color: #1a1a2e; margin-bottom: 16px;
+    padding-bottom: 10px; border-bottom: 3px solid #e8edf2;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title .icon { font-size: 22px; }
+  .section-title .num { background: #1a1a2e; color: #fff; border-radius: 50%; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; margin-right: 6px; }
+
+  /* Macro Cards */
+  .macro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .macro-card {
+    background: #f8f9fc; border-radius: 10px; padding: 16px; border-left: 4px solid #e0e0e0;
+  }
+  .macro-card .label { font-size: 12px; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .macro-card .value { font-size: 14px; color: #1a1a2e; line-height: 1.6; }
+  .macro-card.bullish { border-left-color: #4caf50; }
+  .macro-card.bearish { border-left-color: #f44336; }
+  .macro-card.neutral { border-left-color: #ff9800; }
+  .macro-card.highlight { border-left-color: #3f51b5; background: #eef0ff; }
+
+  .risk-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .risk-tag {
+    display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 13px;
+  }
+  .risk-tag.danger { background: #fbe9e7; color: #c62828; }
+  .risk-tag.success { background: #e8f5e9; color: #2e7d32; }
+  .risk-tag.warning { background: #fff8e1; color: #f57f17; }
+  .risk-tag.info { background: #e3f2fd; color: #1565c0; }
+
+  /* Stock Table */
+  .stock-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .stock-table thead th {
+    background: #f5f6fa; padding: 12px 14px; text-align: left; font-weight: 600; color: #555;
+    border-bottom: 2px solid #e0e0e0; font-size: 13px;
+  }
+  .stock-table tbody td { padding: 14px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  .stock-table tbody tr:hover { background: #f8f9fc; }
+  .stock-table tbody tr:last-child td { border-bottom: none; }
+  .stock-name { font-weight: 600; color: #1a1a2e; }
+  .stock-code { color: #888; font-size: 12px; }
+  .stock-role { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; background: #f0f0f0; color: #666; }
+  .signal-badge {
+    display: inline-block; padding: 4px 12px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  }
+  .signal-strong_buy { background: #c8e6c9; color: #1b5e20; }
+  .signal-buy { background: #e8f5e9; color: #2e7d32; }
+  .signal-hold { background: #fff8e1; color: #f57f17; }
+  .signal-sell { background: #fce4ec; color: #c62828; }
+  .signal-strong_sell { background: #fbe9e7; color: #b71c1c; }
+
+  .score-bar {
+    display: inline-block; height: 6px; border-radius: 3px; background: #e0e0e0; width: 60px; position: relative; vertical-align: middle; margin-right: 6px;
+  }
+  .score-bar-fill { height: 100%; border-radius: 3px; display: block; }
+  .score-high .score-bar-fill { background: #4caf50; width: 70%; }
+  .score-mid .score-bar-fill { background: #ff9800; width: 50%; }
+  .score-low .score-bar-fill { background: #f44336; width: 30%; }
+
+  /* Stock Detail Cards */
+  .stock-detail { background: #f8f9fc; border-radius: 10px; padding: 20px; margin-top: 12px; border: 1px solid #e8edf2; }
+  .stock-detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .stock-detail-header h4 { font-size: 16px; }
+  .stock-summary { font-size: 14px; color: #444; line-height: 1.8; margin-bottom: 12px; }
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+  .metric-item { background: #fff; border-radius: 6px; padding: 10px 12px; border: 1px solid #e8edf2; }
+  .metric-item .mlabel { font-size: 11px; color: #888; font-weight: 600; margin-bottom: 2px; }
+  .metric-item .mvalue { font-size: 14px; color: #1a1a2e; font-weight: 500; }
+
+  .sniper-box { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+  .sniper-item {
+    flex: 1; min-width: 120px; border-radius: 8px; padding: 12px 16px; text-align: center;
+  }
+  .sniper-item .slabel { font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+  .sniper-item .svalue { font-size: 16px; font-weight: 700; }
+  .sniper-buy { background: #e8f5e9; border: 1px solid #c8e6c9; }
+  .sniper-buy .slabel { color: #2e7d32; } .sniper-buy .svalue { color: #1b5e20; }
+  .sniper-stop { background: #fbe9e7; border: 1px solid #ffcdd2; }
+  .sniper-stop .slabel { color: #c62828; } .sniper-stop .svalue { color: #b71c1c; }
+  .sniper-target { background: #e3f2fd; border: 1px solid #bbdefb; }
+  .sniper-target .slabel { color: #1565c0; } .sniper-target .svalue { color: #0d47a1; }
+
+  /* CIO Section */
+  .cio-block { margin-bottom: 16px; }
+  .cio-block h4 { font-size: 15px; color: #1a1a2e; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .cio-block p, .cio-block li { font-size: 14px; color: #444; line-height: 1.8; }
+  .cio-block ul { padding-left: 20px; }
+
+  /* Stats Bar */
+  .stats-bar { display: flex; gap: 16px; flex-wrap: wrap; margin: 16px 0; }
+  .stat-item { text-align: center; flex: 1; min-width: 80px; padding: 12px; background: #f8f9fc; border-radius: 10px; }
+  .stat-item .snum { font-size: 24px; font-weight: 700; }
+  .stat-item .slabel { font-size: 12px; color: #888; margin-top: 2px; }
+  .stat-green .snum { color: #4caf50; } .stat-red .snum { color: #f44336; } .stat-gold .snum { color: #ff9800; } .stat-blue .snum { color: #2196f3; }
+
+  /* Footer */
+  .footer { text-align: center; font-size: 12px; color: #aaa; padding: 30px 0 10px; }
+
+  /* Risk Flags */
+  .risk-list { list-style: none; padding: 0; }
+  .risk-list li { padding: 6px 0 6px 20px; position: relative; font-size: 14px; color: #555; }
+  .risk-list li::before { content: '⚠️'; position: absolute; left: 0; }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    body { padding: 10px; }
+    .header { padding: 24px; }
+    .header h1 { font-size: 22px; }
+    .macro-grid { grid-template-columns: 1fr; }
+    .stock-table { font-size: 12px; }
+    .stock-table thead th, .stock-table tbody td { padding: 8px; }
+    .sniper-box { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>📊 {{ industry_name }} 行业深度分析</h1>
+    <div class="meta">📅 {{ timestamp }} | 🏢 成分股 {{ total_stocks }} 只</div>
+    <div class="badge-row">
+      <span class="badge {% if cio.get('composite_signal') == 'bullish' %}badge-bullish{% elif cio.get('composite_signal') == 'bearish' %}badge-bearish{% else %}badge-neutral{% endif %}">
+        综合信号: {{ cio.get('composite_signal', 'neutral') }}
+      </span>
+      {% if cio.get('composite_confidence') %}
+      <span class="badge badge-info">置信度: {{ "%.0f"|format(cio.composite_confidence * 100) if cio.composite_confidence is mapping else "%.0f"|format(cio.get('composite_confidence', 0) * 100) }}%</span>
+      {% endif %}
+      <span class="badge badge-info">分析模式: Top-Down</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="section">
+    <div class="section-title"><span class="icon">📈</span> 成分股总览</div>
+    <div class="stats-bar">
+      <div class="stat-item stat-blue"><div class="snum">{{ total_stocks }}</div><div class="slabel">总成分股</div></div>
+      <div class="stat-item stat-green"><div class="snum">{{ bullish_count }}</div><div class="slabel">看多</div></div>
+      <div class="stat-item stat-red"><div class="snum">{{ bearish_count }}</div><div class="slabel">看空</div></div>
+      <div class="stat-item stat-gold"><div class="snum">{{ neutral_count }}</div><div class="slabel">中性</div></div>
+      <div class="stat-item stat-blue"><div class="snum">{{ success_count }}</div><div class="slabel">成功分析</div></div>
+    </div>
+  </div>
+
+  <!-- Step 1: Macro -->
+  <div class="section">
+    <div class="section-title"><span class="num">1</span> 行业宏观动向</div>
+
+    <div class="macro-grid">
+      {% if macro.get('sentiment_summary') %}
+      <div class="macro-card {{ macro.get('outlook', 'neutral') }}">
+        <div class="label">景气度判断</div>
+        <div class="value">{{ macro.sentiment_summary }}</div>
+      </div>
+      {% endif %}
+      {% if macro.get('cycle_position') %}
+      <div class="macro-card highlight">
+        <div class="label">周期位置</div>
+        <div class="value">{{ macro.cycle_position }}</div>
+      </div>
+      {% endif %}
+      {% if macro.get('policy_impact') %}
+      <div class="macro-card">
+        <div class="label">政策面</div>
+        <div class="value">{{ macro.policy_impact }}</div>
+      </div>
+      {% endif %}
+      {% if macro.get('competitive_landscape') %}
+      <div class="macro-card">
+        <div class="label">竞争格局</div>
+        <div class="value">{{ macro.competitive_landscape }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if macro.get('core_logic') %}
+    <div style="margin-top: 14px;">
+      <div style="font-size:13px; font-weight:600; color:#888; margin-bottom:6px;">核心驱动逻辑</div>
+      {% set lines = macro.core_logic.split('\n') %}
+      <div class="risk-tags">
+        {% for line in lines %}
+        {% set trimmed = line.strip() %}
+        {% if trimmed %}
+        <span class="risk-tag info">{{ trimmed }}</span>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if macro.get('positive_catalysts') %}
+    <div style="margin-top: 14px;">
+      <div style="font-size:13px; font-weight:600; color:#888; margin-bottom:6px;">积极催化因素</div>
+      <div class="risk-tags">
+        {% for cat in macro.positive_catalysts[:5] %}
+        <span class="risk-tag success">{{ cat }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if macro.get('risk_factors') %}
+    <div style="margin-top: 14px;">
+      <div style="font-size:13px; font-weight:600; color:#888; margin-bottom:6px;">⚠️ 风险因素</div>
+      <ul class="risk-list">
+        {% for risk in macro.risk_factors[:5] %}
+        <li>{{ risk }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Step 2: Stock Comparison Table -->
+  <div class="section">
+    <div class="section-title"><span class="num">2</span> 核心企业表现对比</div>
+    <div style="overflow-x: auto;">
+      <table class="stock-table">
+        <thead>
+          <tr>
+            <th>企业</th>
+            <th>角色</th>
+            <th>信号</th>
+            <th>评分</th>
+            <th>核心结论</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in stocks %}
+          <tr>
+            <td><span class="stock-name">{{ s.name }}</span><br><span class="stock-code">{{ s.code }}</span></td>
+            <td><span class="stock-role">{{ s.role }}</span></td>
+            <td><span class="signal-badge signal-{{ s.signal }}">{{ signal_labels.get(s.signal, s.signal) }}</span></td>
+            <td>
+              <span class="score-bar {% if s.score >= 0.6 %}score-high{% elif s.score >= 0.4 %}score-mid{% else %}score-low{% endif %}">
+                <span class="score-bar-fill" style="width:{{ "%.0f"|format(s.score * 100) }}%"></span>
+              </span>
+              {{ "%.0f"|format(s.score * 100) }}
+            </td>
+            <td style="font-size:13px; color:#555; max-width:250px;">{{ s.summary[:80] }}{% if s.summary|length > 80 %}...{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Step 2: Stock Details -->
+  <div class="section">
+    <div class="section-title"><span class="icon">🔍</span> 核心个股详情</div>
+    {% for s in stocks %}
+    <div class="stock-detail">
+      <div class="stock-detail-header">
+        <div>
+          <h4>{{ s.name }} <span class="stock-code">{{ s.code }}</span></h4>
+          <span class="stock-role">{{ s.role }}</span>
+          <span class="signal-badge signal-{{ s.signal }}">{{ signal_labels.get(s.signal, s.signal) }}</span>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:24px; font-weight:700; {% if s.score >= 0.6 %}color:#4caf50{% elif s.score >= 0.4 %}color:#ff9800{% else %}color:#f44336{% endif %}">{{ "%.0f"|format(s.score * 100) }}</div>
+          <div style="font-size:11px; color:#888;">评分</div>
+        </div>
+      </div>
+      <div class="stock-summary">{{ s.summary }}</div>
+
+      {% if s.key_metrics and s.key_metrics is mapping %}
+      <div class="metrics-grid">
+        {% for mk, mv in s.key_metrics.items() %}
+        <div class="metric-item">
+          <div class="mlabel">{{ mk }}</div>
+          <div class="mvalue">{{ mv[:60] }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if s.risk_flags %}
+      <div style="margin-top: 10px;">
+        {% for flag in s.risk_flags[:3] %}
+        <span class="risk-tag danger">{{ flag }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if s.sniper_points and s.sniper_points is mapping %}
+      <div class="sniper-box">
+        {% if s.sniper_points.get('ideal_buy') %}<div class="sniper-item sniper-buy"><div class="slabel">🎯 理想买入</div><div class="svalue">{{ s.sniper_points.ideal_buy }}</div></div>{% endif %}
+        {% if s.sniper_points.get('secondary_buy') %}<div class="sniper-item sniper-buy"><div class="slabel">📌 次优买入</div><div class="svalue">{{ s.sniper_points.secondary_buy }}</div></div>{% endif %}
+        {% if s.sniper_points.get('stop_loss') %}<div class="sniper-item sniper-stop"><div class="slabel">🛑 止损</div><div class="svalue">{{ s.sniper_points.stop_loss }}</div></div>{% endif %}
+        {% if s.sniper_points.get('target') %}<div class="sniper-item sniper-target"><div class="slabel">🎯 目标</div><div class="svalue">{{ s.sniper_points.target }}</div></div>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Step 3: CIO Strategy -->
+  <div class="section">
+    <div class="section-title"><span class="num">3</span> AI 综合投资策略</div>
+
+    {% if cio.get('chain_analysis') %}
+    <div class="cio-block">
+      <h4>🔗 产业链点评</h4>
+      <p>{{ cio.chain_analysis }}</p>
+    </div>
+    {% endif %}
+
+    {% if cio.get('leader_analysis') %}
+    <div class="cio-block">
+      <h4>🏆 龙头企业深度分析</h4>
+      <p>{{ cio.leader_analysis }}</p>
+    </div>
+    {% endif %}
+
+    {% if cio.get('allocation_advice') %}
+    <div class="cio-block">
+      <h4>📋 配置建议</h4>
+      <p>{{ cio.allocation_advice }}</p>
+    </div>
+    {% endif %}
+
+    {% if cio.get('comparative_insight') %}
+    <div class="cio-block">
+      <h4>📊 横向对比洞察</h4>
+      <p>{{ cio.comparative_insight }}</p>
+    </div>
+    {% endif %}
+
+    {% if cio.get('risk_warning') %}
+    <div class="cio-block">
+      <h4>⚠️ 行业风险提示</h4>
+      <ul class="risk-list">
+        {% for line in cio.risk_warning.split('\n') %}
+        {% set t = line.strip() %}
+        {% if t %}
+        <li>{{ t }}</li>
+        {% endif %}
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="footer">
+    <p>本报告由 AI 行业分析管线自动生成 · 仅供参考，不构成投资建议</p>
+    <p>生成时间: {{ timestamp }}</p>
+  </div>
+
+</div>
+</body>
+</html>
