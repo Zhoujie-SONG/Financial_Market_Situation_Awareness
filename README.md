@@ -337,8 +337,4 @@ python main.py --webui-only
 
 本项目基于 MIT 协议开源，欢迎自由使用和二次开发。
 
----
 
-## 🗺️ 项目规划
-
-查看已支持的功能和未来规划：[更新日志](docs/CHANGELOG.md)
