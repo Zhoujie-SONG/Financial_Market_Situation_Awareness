@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] 未启用桥接时，交易所前后缀不一致的代码不再在快照绑定阶段抛异常。
 - [改进] canonical 修订版本按日期范围单次读取；provenance 新增与查询时间无关的 `content_hash`；canonical 趋势分析窗口与旧路径一致并补充均线形态；显式 fallback 成功计入运行统计；personal-quant 配置项加入 Web 设置页。
 - [文档] README（简中/繁中/英文）补充免责声明与复权、数据过期说明；issue 模板、贡献指南、完整指南中的 issue 与 clone 链接改为本仓库，注明上游 Docker 镜像不含本项目改动；CODEOWNERS 改为本仓库维护者。
+- [修复] 恢复 `scripts/*.sh` 的可执行权限，CI backend-gate 不再因 exit 126 失败。
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
