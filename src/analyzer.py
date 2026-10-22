@@ -761,6 +761,7 @@ class AnalysisResult:
             'buy_reason': self.buy_reason,
             'market_snapshot': self.market_snapshot,
             'search_performed': self.search_performed,
+            'data_sources': self.data_sources,
             'success': self.success,
             'error_message': self.error_message,
             'current_price': self.current_price,

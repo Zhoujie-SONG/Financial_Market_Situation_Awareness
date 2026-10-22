@@ -16,6 +16,8 @@
 from __future__ import annotations
 
 import logging
+import math
+import threading
 from typing import Any, Dict, List, Optional
 
 from src.config import Config
@@ -64,6 +66,7 @@ class SingleStockPipeline(BasePipeline):
     def __init__(self, config: Optional[Config] = None):
         super().__init__(config)
         self._pipeline = None  # 延迟初始化
+        self._pipeline_lock = threading.RLock()
 
     # ──────────────────────────────────────────────
     # 内部: 延迟加载 StockAnalysisPipeline
@@ -72,9 +75,10 @@ class SingleStockPipeline(BasePipeline):
     def _get_pipeline(self):
         """延迟加载现有的 StockAnalysisPipeline，避免 import 循环。"""
         if self._pipeline is None:
-            from src.core.pipeline import StockAnalysisPipeline
-
-            self._pipeline = StockAnalysisPipeline(config=self.config)
+            with self._pipeline_lock:
+                if self._pipeline is None:
+                    from src.core.pipeline import StockAnalysisPipeline
+                    self._pipeline = StockAnalysisPipeline(config=self.config)
         return self._pipeline
 
     # ──────────────────────────────────────────────
@@ -210,7 +214,7 @@ class SingleStockPipeline(BasePipeline):
         dash = result.dashboard if isinstance(result.dashboard, dict) else {}
 
         # ── 核心字段 ──
-        raw_score = getattr(result, "sentiment_score", 50)
+        raw_score = safe_score(getattr(result, "sentiment_score", 50))
         score = normalize_score(raw_score)
         signal = _signal_from_score(raw_score)
         decision_type = (
@@ -242,6 +246,7 @@ class SingleStockPipeline(BasePipeline):
             "key_metrics": key_metrics,
             "risk_flags": risk_flags,
             "sniper_points": sniper_points,
+            "data_provenance": (getattr(result, "market_snapshot", None) or {}).get("data_provenance"),
         }
 
 
@@ -254,24 +259,19 @@ def normalize_score(raw_score: Any) -> float:
     """
     将各种格式的评分归一化到 0.0 ~ 1.0 浮点数。
 
-    输入可能是:
-    - int (0-100, 源码默认 50)
-    - float (0.0-100.0, 部分数据源)
-    - str
+    AnalysisResult 的输入契约固定为 0-100（可为数字或数字字符串）。
+    非法/非有限值使用中性值 50；不按数值大小猜测评分尺度。
     """
+    return safe_score(raw_score) / 100.0
+
+
+def safe_score(raw_score: Any) -> float:
+    """AnalysisResult sentiment_score is 0–100; never infer a scale from its value."""
     try:
         score = float(raw_score)
     except (TypeError, ValueError):
-        return 0.5
-
-    # 如果 > 5 则认为是 0-100 制
-    if abs(score) > 5:
-        return max(0.0, min(1.0, score / 100.0))
-    # 如果 ≤ 1 则已归一化
-    if abs(score) <= 1:
-        return max(0.0, min(1.0, score))
-    # 否则 clip
-    return max(0.0, min(1.0, score / 10.0))
+        return 50.0
+    return max(0.0, min(100.0, score)) if math.isfinite(score) else 50.0
 
 
 def infer_decision_from_score(score: int) -> str:

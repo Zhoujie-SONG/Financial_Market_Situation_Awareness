@@ -50,6 +50,10 @@ from src.core.trading_calendar import (
 )
 from data_provider.us_index_mapping import is_us_stock_code
 from bot.models import BotMessage
+from src.services.personal_quant import (
+    attach_result_provenance, bind_daily_snapshot, frame_analysis_context,
+    get_daily_snapshot, reset_daily_snapshot,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -99,6 +103,8 @@ class StockAnalysisPipeline:
         # 初始化各模块
         self.db = get_db()
         self.fetcher_manager = DataFetcherManager()
+        self._canonical_fetch_success = set()
+        self._canonical_fetch_lock = threading.Lock()
         # 不再单独创建 akshare_fetcher，统一使用 fetcher_manager 获取增强数据
         self.trend_analyzer = StockTrendAnalyzer()  # 技术分析器
         self.analyzer = GeminiAnalyzer(config=self.config)
@@ -211,7 +217,8 @@ class StockAnalysisPipeline:
             )
 
             # 断点续传检查：如果最新可复用交易日的数据已存在，则跳过
-            if not force_refresh and self.db.has_today_data(code, target_date):
+            canonical_enabled = self.fetcher_manager.uses_personal_quant(code) is True
+            if not canonical_enabled and not force_refresh and self.db.has_today_data(code, target_date):
                 logger.info(
                     f"{stock_name}({code}) {target_date} 数据已存在，跳过获取（断点续传）"
                 )
@@ -219,10 +226,19 @@ class StockAnalysisPipeline:
 
             # 从数据源获取数据
             logger.info(f"{stock_name}({code}) 开始从数据源获取数据...")
-            df, source_name = self.fetcher_manager.get_daily_data(code, days=30)
+            df, source_name = self.fetcher_manager.get_daily_data(code, days=240 if canonical_enabled else 30)
 
             if df is None or df.empty:
                 return False, "获取数据为空"
+
+            if source_name == "PersonalQuantFetcher":
+                bind_daily_snapshot(code, df)
+                lock = getattr(self, "_canonical_fetch_lock", None)
+                if lock is not None:
+                    with lock:
+                        self._canonical_fetch_success.add(code)
+                logger.info("%s canonical snapshot bound (%d bars); mutable daily cache bypassed", code, len(df))
+                return True, None
 
             # 保存到数据库
             saved_count = self.db.save_daily_data(df, code, source_name)
@@ -352,9 +368,10 @@ class StockAnalysisPipeline:
                 frozen = get_frozen_target_date()
                 end_date = frozen if frozen else get_market_now(_mkt).date()
                 start_date = end_date - timedelta(days=89)  # ~60 trading days for MA60
-                historical_bars = self.db.get_data_range(code, start_date, end_date)
-                if historical_bars:
-                    df = pd.DataFrame([bar.to_dict() for bar in historical_bars])
+                canonical_frame = get_daily_snapshot(code)
+                historical_bars = [] if canonical_frame is not None else self.db.get_data_range(code, start_date, end_date)
+                if canonical_frame is not None or historical_bars:
+                    df = canonical_frame.copy() if canonical_frame is not None else pd.DataFrame([bar.to_dict() for bar in historical_bars])
                     # Issue #234: Augment with realtime for intraday MA calculation
                     if self.config.enable_realtime_quote and realtime_quote:
                         df = self._augment_historical_with_realtime(df, realtime_quote, code)
@@ -433,7 +450,11 @@ class StockAnalysisPipeline:
 
             # Step 5: 获取分析上下文（技术面数据）
             self._emit_progress(58, f"{stock_name}：正在整理分析上下文")
-            context = self.db.get_analysis_context(code)
+            canonical_frame = get_daily_snapshot(code)
+            context = (
+                frame_analysis_context(code, canonical_frame)
+                if canonical_frame is not None else self.db.get_analysis_context(code)
+            )
 
             if context is None:
                 logger.warning(f"{stock_name}({code}) 无法获取历史行情数据，将仅基于新闻和实时行情分析")
@@ -483,6 +504,7 @@ class StockAnalysisPipeline:
             # Step 7.5: 填充分析时的价格信息到 result
             if result:
                 self._emit_progress(94, f"{stock_name}：正在校验并整理分析结果")
+                attach_result_provenance(result, code)
                 result.query_id = query_id
                 realtime_data = enhanced_context.get('realtime', {})
                 result.current_price = realtime_data.get('price')
@@ -743,6 +765,8 @@ class StockAnalysisPipeline:
 
     def _ensure_agent_history(self, code: str, min_days: int = 240) -> None:
         """Ensure at least *min_days* of K-line history is in DB for agent tools."""
+        if get_daily_snapshot(code) is not None:
+            return
         from src.services.history_loader import get_frozen_target_date
 
         target = get_frozen_target_date()
@@ -790,6 +814,10 @@ class StockAnalysisPipeline:
                 "report_language": report_language,
                 "fundamental_context": fundamental_context,
             }
+            canonical_frame = get_daily_snapshot(code)
+            if canonical_frame is not None:
+                initial_context["data_provenance"] = canonical_frame.attrs["personal_quant"]
+                initial_context["resolved_etf_metadata"] = canonical_frame.attrs.get("resolved_etf_metadata", {})
             
             if realtime_quote:
                 initial_context["realtime_quote"] = self._safe_to_dict(realtime_quote)
@@ -835,6 +863,7 @@ class StockAnalysisPipeline:
             )
             if result:
                 result.query_id = query_id
+                attach_result_provenance(result, code)
             # Agent weak integrity: placeholder fill only, no LLM retry
             if result and getattr(self.config, "report_integrity_enabled", False):
                 from src.analyzer import check_content_integrity, apply_placeholder_fill
@@ -1620,6 +1649,7 @@ class StockAnalysisPipeline:
 
         from src.services.history_loader import set_frozen_target_date, reset_frozen_target_date
         frozen_td = self._resolve_resume_target_date(code, current_time=current_time)
+        canonical_token = bind_daily_snapshot(code, None)
         token = set_frozen_target_date(frozen_td)
         try:
             self._emit_progress(12, f"{code}：正在准备分析任务")
@@ -1630,6 +1660,9 @@ class StockAnalysisPipeline:
             
             if not success:
                 logger.warning(f"[{code}] 数据获取失败: {error}")
+                if self.fetcher_manager.uses_personal_quant(code) is True:
+                    logger.error("[%s] Canonical input failed; stopping before cached/live analysis", code)
+                    return None
                 # 即使获取失败，也尝试用已有数据分析
             else:
                 self._emit_progress(16, f"{code}：行情数据准备完成")
@@ -1641,6 +1674,7 @@ class StockAnalysisPipeline:
             
             effective_query_id = analysis_query_id or self.query_id or uuid.uuid4().hex
             result = self.analyze_stock(code, report_type, query_id=effective_query_id)
+            attach_result_provenance(result, code)
             
             if result and result.success:
                 logger.info(
@@ -1667,6 +1701,7 @@ class StockAnalysisPipeline:
             logger.exception(f"[{code}] 处理过程发生未知异常: {e}")
             return None
         finally:
+            reset_daily_snapshot(canonical_token)
             reset_frozen_target_date(token)
     
     def run(
@@ -1695,6 +1730,9 @@ class StockAnalysisPipeline:
             分析结果列表
         """
         start_time = time.time()
+        if hasattr(self, "_canonical_fetch_lock"):
+            with self._canonical_fetch_lock:
+                self._canonical_fetch_success.clear()
         
         # 使用配置中的股票列表
         if stock_codes is None:
@@ -1802,11 +1840,13 @@ class StockAnalysisPipeline:
             success_count = sum(
                 1
                 for code in stock_codes
-                if self.db.has_today_data(
-                    code,
-                    self._resolve_resume_target_date(
-                        code, current_time=resume_reference_time
-                    ),
+                if (
+                    code in getattr(self, "_canonical_fetch_success", set())
+                    if self.fetcher_manager.uses_personal_quant(code) is True
+                    else self.db.has_today_data(
+                        code,
+                        self._resolve_resume_target_date(code, current_time=resume_reference_time),
+                    )
                 )
             )
             fail_count = len(stock_codes) - success_count

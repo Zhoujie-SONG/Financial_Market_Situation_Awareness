@@ -1,0 +1,3 @@
+# Optional canonical-data integration, pinned to the audited personal-quant baseline.
+# For local development instead: python -m pip install -e /path/to/personal-quant
+etf-quant @ git+https://github.com/Zhoujie-SONG/personal-quant.git@4508ca6cd8204976b53c9f982ecfbc34421ce744

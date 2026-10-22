@@ -67,6 +67,8 @@ jobs:
             echo "Dependency install attempt ${attempt} failed, retrying in 15s..." >&2
             sleep 15
           done
+      - name: 📦 Install canonical bridge test dependency
+        run: python -m pip install -r requirements-personal-quant.txt
       - name: ✅ Python syntax check
         run: ./scripts/ci_gate.sh syntax
       - name: ✅ Flake8 critical checks

@@ -146,6 +146,17 @@ def load_history_df(
     # Calendar-day buffer: ~1.8x trading days + margin for long holidays
     start = end - timedelta(days=int(days * 1.8) + 10)
 
+    # Canonical pipeline tools must consume the same bound observation set, not
+    # a mutable DB hit or a fresh provider response with a different cutoff.
+    from src.services.personal_quant import get_daily_snapshot
+    canonical_frame = get_daily_snapshot(stock_code)
+    if canonical_frame is not None:
+        frame = canonical_frame.loc[
+            (pd.to_datetime(canonical_frame["date"]).dt.date >= start)
+            & (pd.to_datetime(canonical_frame["date"]).dt.date <= end)
+        ].copy()
+        return (frame, "PersonalQuantFetcher") if not frame.empty else (None, "none")
+
     # --- 1. DB lookup (canonical code, then prefix-stripped fallback) ------
     try:
         db = get_db()

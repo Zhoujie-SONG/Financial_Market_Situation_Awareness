@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [新功能] 可选接入 personal-quant immutable canonical ETF 日线和逐字段 MetadataResolver，支持显式 Economic/System Replay、research cutoff 与可审计 dataset snapshot id。
+- [改进] canonical 模式下单股/行业/Agent 共享请求绑定的日线输入，跳过 mutable 日线缓存，默认关闭在线 fallback。
+- [修复] 行业成分股请求延迟实际执行；评分固定采用 0–100 契约，修复低分尺度误判，并保护单股管线并发初始化。
+- [测试] 增加只读 PIT bridge、revision/cutoff、默认失败边界、缓存隔离和行业聚合回归；默认 pytest 只收集 tests/ 并排除 network。
+- [文档] 重写中英文与繁体 README，补回可提交的 .env.example，新增接入/部署/回退说明。
+- [修复] 保持旧 CLI 调用缺省 stock 模式，静态 JS/CSS 响应使用跨平台一致的 MIME，SQLite 并发测试先释放连接再清理临时目录。
+
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 - [改进] Docker 镜像支持非 root 用户 (`dsa`, UID 1000) 执行，并增强 `Dockerfile` 安全性与构建稳健性。

@@ -4,6 +4,8 @@
 
 > 💡 快速上手请参考 [README.md](../README.md)，本文档为进阶配置。
 
+> ETF 本地 canonical 行情、PIT 时间语义、逐字段元数据和部署挂载见 [personal-quant 接入说明](personal-quant-integration.md)。
+
 ## 📁 项目结构
 
 ```

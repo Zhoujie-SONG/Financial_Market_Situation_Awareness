@@ -4,6 +4,8 @@ This document contains the complete configuration guide for the AI Stock Analysi
 
 > Quick start guide available in [README_EN.md](README_EN.md). This document covers advanced configuration.
 
+> For optional canonical ETF bars, PIT query modes, field-level metadata and read-only deployment mounts, see [personal-quant integration](personal-quant-integration.md).
+
 ## Project Structure
 
 ```

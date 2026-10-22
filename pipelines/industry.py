@@ -13,7 +13,7 @@ Top-Down 行业深度分析流程:
                 → 并发调用 SingleStockPipeline.analyze_single()
 
   Step 3 (聚合): 行业逻辑 + 各企业微观表现合并
-                → CIO Agent 生成行业全景研报（Phase 4 实现）
+                → CIO Agent 生成行业全景研报
 
 设计要点:
 - 并发处理成分股，使用 asyncio.Semaphore + 请求间隔
@@ -86,6 +86,8 @@ class IndustryPipeline(BasePipeline):
         request_delay: float = DEFAULT_INDUSTRY_REQUEST_DELAY,
     ):
         super().__init__(config)
+        if concurrency < 1 or request_delay < 0:
+            raise ValueError("concurrency must be positive and request_delay must be non-negative")
         self.concurrency = concurrency
         self.request_delay = request_delay
 
@@ -456,6 +458,8 @@ class IndustryPipeline(BasePipeline):
                 role = stock.get("role", "")
 
                 try:
+                    if self.request_delay:
+                        await asyncio.sleep(self.request_delay)
                     logger.info(
                         "  [%d/%d] 分析 %s(%s) [%s]",
                         index + 1,
@@ -487,9 +491,6 @@ class IndustryPipeline(BasePipeline):
                         "error": str(exc),
                         "status": "failed",
                     }
-
-            # 请求间隔 — 在 semaphore 内部释放后等待
-            await asyncio.sleep(self.request_delay)
 
         tasks = [_analyze_one(stock, i) for i, stock in enumerate(stocks)]
         raw_results = await asyncio.gather(*tasks)

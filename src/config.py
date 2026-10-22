@@ -601,6 +601,11 @@ class Config:
     longbridge_app_secret: Optional[str] = None
     longbridge_access_token: Optional[str] = None
 
+    # Optional read-only personal-quant data bridge. Unset preserves legacy routing.
+    personal_quant_canonical_dir: Optional[str] = None
+    personal_quant_metadata_policy: Optional[str] = None
+    personal_quant_allow_fallback: bool = False
+
     # === AI 分析配置 ===
     # LiteLLM unified model config (provider/model format, e.g. gemini/gemini-3.1-pro-preview)
     litellm_model: str = ""  # Primary model; must include provider prefix when set explicitly
@@ -1315,6 +1320,9 @@ class Config:
             feishu_app_secret=os.getenv('FEISHU_APP_SECRET'),
             feishu_folder_token=os.getenv('FEISHU_FOLDER_TOKEN'),
             tushare_token=os.getenv('TUSHARE_TOKEN'),
+            personal_quant_canonical_dir=os.getenv('PERSONAL_QUANT_CANONICAL_DIR', '').strip() or None,
+            personal_quant_metadata_policy=os.getenv('PERSONAL_QUANT_METADATA_POLICY', '').strip() or None,
+            personal_quant_allow_fallback=os.getenv('PERSONAL_QUANT_ALLOW_FALLBACK', 'false').strip().lower() == 'true',
             tickflow_api_key=os.getenv('TICKFLOW_API_KEY'),
             longbridge_app_key=os.getenv('LONGBRIDGE_APP_KEY') or None,
             longbridge_app_secret=os.getenv('LONGBRIDGE_APP_SECRET') or None,

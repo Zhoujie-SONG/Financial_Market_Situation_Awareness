@@ -866,7 +866,7 @@ def main() -> int:
         # ══════════════════════════════════════════════════
         # 模式 B: 行业深度分析
         # ══════════════════════════════════════════════════
-        if args.mode == "industry":
+        if getattr(args, "mode", "stock") == "industry":
             logger.info("=" * 60)
             logger.info("模式: 行业深度分析 (Industry Deep-Dive)")
             logger.info("=" * 60)

@@ -103,6 +103,11 @@ def _resolve_asset_path(assets_dir: Path, asset_path: str) -> Optional[Path]:
 
 def _missing_asset_media_type(asset_path: str) -> str:
     """Return a safe media type for a missing asset response."""
+    suffix = Path(asset_path).suffix.lower()
+    if suffix in {".js", ".mjs"}:
+        return "text/javascript"
+    if suffix == ".css":
+        return "text/css"
     content_type, _ = mimetypes.guess_type(asset_path)
     if content_type in _SAFE_MISSING_ASSET_MEDIA_TYPES:
         return content_type
@@ -288,7 +293,10 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
                 )
             if file_path.is_file():
                 relative_path = file_path.relative_to(assets_root).as_posix()
-                return await assets_static_files.get_response(relative_path, request.scope)
+                response = await assets_static_files.get_response(relative_path, request.scope)
+                if file_path.suffix.lower() in {".js", ".mjs", ".css"} and response.status_code != 304:
+                    response.headers["content-type"] = _missing_asset_media_type(relative_path) + "; charset=utf-8"
+                return response
             return Response(
                 content="asset not found",
                 status_code=404,

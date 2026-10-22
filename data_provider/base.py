@@ -871,6 +871,10 @@ class DataFetcherManager:
         baostock = BaostockFetcher()
         yfinance = YfinanceFetcher()
         longbridge = LongbridgeFetcher()  # 长桥（美股/港股兜底，懒加载）
+        from src.config import get_config
+        from src.services.personal_quant import PersonalQuantOptions
+        from .personal_quant_fetcher import PersonalQuantFetcher
+        personal_quant_options = PersonalQuantOptions.from_config(get_config())
 
         # 初始化数据源列表
         self._ensure_concurrency_guards()
@@ -884,6 +888,8 @@ class DataFetcherManager:
                 yfinance,
                 longbridge,
             ]
+            if personal_quant_options is not None:
+                self._fetchers.append(PersonalQuantFetcher(personal_quant_options))
 
             # 按优先级排序（Tushare 如果配置了 Token 且初始化成功，优先级为 0）
             self._fetchers.sort(key=lambda f: f.priority)
@@ -898,6 +904,13 @@ class DataFetcherManager:
         with self._fetchers_lock:
             self._fetchers.append(fetcher)
             self._fetchers.sort(key=lambda f: f.priority)
+
+    def uses_personal_quant(self, stock_code: str) -> bool:
+        """Whether a mainland ETF has explicitly opted into canonical reads."""
+        return any(
+            fetcher.name == "PersonalQuantFetcher" and fetcher.supports(stock_code)
+            for fetcher in self._get_fetchers_snapshot()
+        )
     
     def get_daily_data(
         self, 
@@ -930,10 +943,29 @@ class DataFetcherManager:
         """
         from .us_index_mapping import is_us_index_code, is_us_stock_code
 
+        # Check explicit ETF exchange identity before normalizers strip suffixes.
+        canonical_fetchers = [
+            item for item in self._get_fetchers_snapshot()
+            if item.name == "PersonalQuantFetcher" and item.supports(stock_code)
+        ]
+        for canonical_fetcher in canonical_fetchers:
+            try:
+                frame = self._call_fetcher_method(
+                    canonical_fetcher, "get_daily_data", stock_code=stock_code,
+                    start_date=start_date, end_date=end_date, days=days,
+                )
+                if frame is None or frame.empty:
+                    raise DataFetchError("Canonical query returned no eligible bars")
+                return frame, canonical_fetcher.name
+            except Exception as exc:
+                if not canonical_fetcher.options.allow_fallback:
+                    raise DataFetchError(f"personal-quant canonical query failed: {exc}") from exc
+                logger.warning("Canonical data unavailable for %s; explicit legacy fallback enabled: %s", stock_code, exc)
+
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
 
-        fetchers = self._get_fetchers_snapshot()
+        fetchers = [item for item in self._get_fetchers_snapshot() if item.name != "PersonalQuantFetcher"]
         errors = []
         total_fetchers = len(fetchers)
         request_start = time.time()
