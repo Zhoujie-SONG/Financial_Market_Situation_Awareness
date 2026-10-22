@@ -369,12 +369,14 @@ Dockerfile 使用多阶段构建，前端会在构建镜像时自动打包并内
 - GHCR：`ghcr.io/zhulinsen/daily_stock_analysis:<tag>`
 - Docker Hub：`<DOCKERHUB_USERNAME>/daily_stock_analysis:<tag>`（由发布者的 `DOCKERHUB_USERNAME` secret 决定，官方发布为 `zhulinsen/daily_stock_analysis`）
 
+> 以上是上游项目 daily_stock_analysis 发布的镜像，不包含本项目的行业研究与 personal-quant 接入等改动。使用本项目请按下方“快速启动”在本地构建镜像。
+
 ### 快速启动
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/ZhuLinsen/daily_stock_analysis.git
-cd daily_stock_analysis
+git clone https://github.com/Zhoujie-SONG/Financial_Market_Situation_Awareness.git
+cd Financial_Market_Situation_Awareness
 
 # 2. 配置环境变量
 cp .env.example .env
@@ -1175,7 +1177,7 @@ A: 检查是否启用了 Actions，以及 cron 表达式是否正确（注意是
 
 ---
 
-更多问题请 [提交 Issue](https://github.com/ZhuLinsen/daily_stock_analysis/issues)
+更多问题请 [提交 Issue](https://github.com/Zhoujie-SONG/Financial_Market_Situation_Awareness/issues)
 
 ## Agent 工具数据缓存与持久化
 

@@ -54,7 +54,13 @@ The bridge reads existing finalized unadjusted Longbridge observations. It does 
 
 Historical queries require explicit mode/as-of; Economic queries additionally require research cutoff. Output includes revision IDs, value hashes, availability policy, historical semantics, metadata field statuses and a dataset snapshot fingerprint. Historical latest is distinct from true historical vintage.
 
+Analysis of the current view stops when the latest local bar lags the latest closed session by more than `PERSONAL_QUANT_MAX_STALE_SESSIONS` (default 1). Canonical bars are unadjusted, unlike the forward-adjusted legacy providers; see "复权口径" in the integration contract.
+
 See the [integration contract](personal-quant-integration.md) for commands, time semantics, Docker mounts, audit provenance, limitations and rollback.
+
+## Disclaimer
+
+This project is for research and learning. Scores, trend calls and entry/exit levels in reports are produced by rules and large language models and may rely on stale, incomplete or incorrect data. Nothing here is investment advice; you are responsible for any trading decision and its consequences.
 
 ## Validation and source
 

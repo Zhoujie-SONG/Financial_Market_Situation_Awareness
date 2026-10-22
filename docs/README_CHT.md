@@ -52,7 +52,13 @@ PERSONAL_QUANT_ALLOW_FALLBACK=false
 
 先在 personal-quant 完成 ingestion。本專案只讀取已入庫的 finalized、未復權 Longbridge observations，保留修訂、三時間戳、欄位狀態和快照指紋。當前 ETF 分析使用 SYSTEM_REPLAY，失敗預設停止；明確啟用 fallback 後才使用舊線上來源。canonical 日線不經過應用的可覆寫日線快取。
 
+目前視圖下，本地最新 K 線落後最近已收盤交易日超過 `PERSONAL_QUANT_MAX_STALE_SESSIONS`（預設 1）個交易日時停止分析。canonical 日線為不復權價格，與舊鏈路的前復權口徑不同，詳見接入說明的「复权口径」。
+
 歷史匯出明確指定 mode、as-of，Economic 模式還需 research cutoff。Historical latest 不等於真實 historical vintage。完整指令、時間語義、部署掛載與回退方式見 [接入說明](personal-quant-integration.md)。
+
+## 免責聲明
+
+本專案用於研究與學習。報告中的評分、趨勢判斷與買賣點位由規則與大型語言模型產生，可能基於過期、不完整或錯誤的資料，不構成任何投資建議。據此進行的交易決策及其後果由使用者自行承擔。
 
 ## 驗證與來源
 

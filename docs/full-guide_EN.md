@@ -334,12 +334,14 @@ Official image registries:
 - GHCR: `ghcr.io/zhulinsen/daily_stock_analysis:<tag>`
 - Docker Hub: `<DOCKERHUB_USERNAME>/daily_stock_analysis:<tag>` (driven by the publisher's `DOCKERHUB_USERNAME` secret; the official release uses `zhulinsen/daily_stock_analysis`)
 
+> These are images published by the upstream daily_stock_analysis project and do not include this project's changes such as industry research and the personal-quant integration. To run this project, build the image locally with the quick start below.
+
 ### Quick Start
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/ZhuLinsen/daily_stock_analysis.git
-cd daily_stock_analysis
+git clone https://github.com/Zhoujie-SONG/Financial_Market_Situation_Awareness.git
+cd Financial_Market_Situation_Awareness
 
 # 2. Configure environment variables
 cp .env.example .env
@@ -1051,4 +1053,4 @@ AGENT_EVENT_ALERT_RULES_JSON=[{"stock_code":"600519","alert_type":"price_cross",
 
 ---
 
-For more questions, please [submit an Issue](https://github.com/ZhuLinsen/daily_stock_analysis/issues)
+For more questions, please [submit an Issue](https://github.com/Zhoujie-SONG/Financial_Market_Situation_Awareness/issues)

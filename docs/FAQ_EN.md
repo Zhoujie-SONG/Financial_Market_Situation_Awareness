@@ -342,7 +342,7 @@ python main.py --market-only
 
 If the above content doesn't solve your issue, welcome to:
 1. Check [Complete Configuration Guide](full-guide_EN.md)
-2. Search or submit [GitHub Issue](https://github.com/ZhuLinsen/daily_stock_analysis/issues)
+2. Search or submit [GitHub Issue](https://github.com/Zhoujie-SONG/Financial_Market_Situation_Awareness/issues)
 3. Check [Changelog](CHANGELOG.md) for latest fixes
 
 ---

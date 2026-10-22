@@ -75,7 +75,7 @@ $env:PERSONAL_QUANT_METADATA_POLICY = '<personal-quant目录>/configs/metadata_r
 python main.py --stocks 510300,159915 --no-notify
 ```
 
-配置后，内地 ETF 日线优先采用 canonical 数据；未配置时沿用原有多数据源流程。默认 canonical 查询失败即停止该 ETF 分析。只有显式设置 `PERSONAL_QUANT_ALLOW_FALLBACK=true` 才启用旧的在线日线来源，日志和 source 字段会保留真实来源。
+配置后，内地 ETF 日线优先采用 canonical 数据；未配置时沿用原有多数据源流程。默认 canonical 查询失败即停止该 ETF 分析；本地最新 K 线落后超过 `PERSONAL_QUANT_MAX_STALE_SESSIONS`（默认 1）个交易日也视为失败。只有显式设置 `PERSONAL_QUANT_ALLOW_FALLBACK=true` 才启用旧的在线日线来源，日志和 source 字段会保留真实来源。canonical 日线为不复权价格，与旧链路的前复权口径不同，详见接入文档的“复权口径”。
 
 canonical 结果保留 source、availability policy、historical semantics、research cutoff 与 `dataset_snapshot_id`。ETF 元数据复用 personal-quant 的 field resolver，保留 `RESOLVED / UNKNOWN / STALE / CONFLICT`，不会将未知字段补成“已验证”。
 
@@ -98,7 +98,7 @@ Economic PIT 不等于真实 historical vintage。详细时间语义、缓存隔
 | `.env` 的 `STOCK_LIST`、`config/industries.yaml` | 自选股与行业定义 |
 | `api/`、`bot/` | API 与机器人接入 |
 | `apps/dsa-web/`、`apps/dsa-desktop/` | React 工作台与桌面壳 |
-| `templates/`、`src/reports/` | 报告渲染 |
+| `templates/`、`src/services/report_renderer.py` | 报告渲染 |
 | `tests/`、`scripts/`、`docs/` | 测试、运维入口与专题文档 |
 
 ## 验证
@@ -111,6 +111,10 @@ python -m pytest tests/test_personal_quant_bridge.py tests/test_industry_pipelin
 ```
 
 默认仅收集 `tests/` 并排除 `network` 测试；真实服务测试显式运行 `python -m pytest -m network`。Linux CI 的完整后端检查入口为 `./scripts/ci_gate.sh`。
+
+## 免责声明
+
+本项目用于研究与学习。报告中的评分、趋势判断和买卖点位由规则与大模型生成，可能基于过期、不完整或错误的数据，不构成任何投资建议。据此进行的交易决策及其后果由使用者自行承担。
 
 ## 开源来源
 
