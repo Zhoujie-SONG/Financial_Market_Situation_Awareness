@@ -4,7 +4,7 @@ Thank you for your interest in contributing! All kinds of contributions are welc
 
 ## 🐛 Reporting Bugs
 
-1. Search [Issues](https://github.com/ZhuLinsen/daily_stock_analysis/issues) first to check if it has already been reported.
+1. Search [Issues](https://github.com/Zhoujie-SONG/Financial_Market_Situation_Awareness/issues) first to check if it has already been reported.
 2. Create a new Issue using the **Bug Report** template.
 3. Provide detailed reproduction steps and environment information.
 
@@ -20,8 +20,8 @@ Thank you for your interest in contributing! All kinds of contributions are welc
 
 ```bash
 # Clone the repository
-git clone https://github.com/ZhuLinsen/daily_stock_analysis.git
-cd daily_stock_analysis
+git clone https://github.com/Zhoujie-SONG/Financial_Market_Situation_Awareness.git
+cd Financial_Market_Situation_Awareness
 
 # Create a virtual environment
 python -m venv venv

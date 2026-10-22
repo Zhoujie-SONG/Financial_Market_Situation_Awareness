@@ -605,6 +605,7 @@ class Config:
     personal_quant_canonical_dir: Optional[str] = None
     personal_quant_metadata_policy: Optional[str] = None
     personal_quant_allow_fallback: bool = False
+    personal_quant_max_stale_sessions: int = 1
 
     # === AI 分析配置 ===
     # LiteLLM unified model config (provider/model format, e.g. gemini/gemini-3.1-pro-preview)
@@ -1322,7 +1323,11 @@ class Config:
             tushare_token=os.getenv('TUSHARE_TOKEN'),
             personal_quant_canonical_dir=os.getenv('PERSONAL_QUANT_CANONICAL_DIR', '').strip() or None,
             personal_quant_metadata_policy=os.getenv('PERSONAL_QUANT_METADATA_POLICY', '').strip() or None,
-            personal_quant_allow_fallback=os.getenv('PERSONAL_QUANT_ALLOW_FALLBACK', 'false').strip().lower() == 'true',
+            personal_quant_allow_fallback=parse_env_bool(os.getenv('PERSONAL_QUANT_ALLOW_FALLBACK'), default=False),
+            personal_quant_max_stale_sessions=parse_env_int(
+                os.getenv('PERSONAL_QUANT_MAX_STALE_SESSIONS'), 1,
+                field_name='PERSONAL_QUANT_MAX_STALE_SESSIONS', minimum=0,
+            ),
             tickflow_api_key=os.getenv('TICKFLOW_API_KEY'),
             longbridge_app_key=os.getenv('LONGBRIDGE_APP_KEY') or None,
             longbridge_app_secret=os.getenv('LONGBRIDGE_APP_SECRET') or None,

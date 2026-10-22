@@ -267,3 +267,128 @@ def test_metadata_is_read_only_and_retains_field_status(canonical_store, tmp_pat
     with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True) as connection:
         with pytest.raises(sqlite3.OperationalError):
             connection.execute("CREATE TABLE forbidden (id INTEGER)")
+
+
+def test_mismatched_exchange_does_not_break_legacy_binding():
+    # Binding happens for every code even when the bridge is off; it must not raise.
+    for code in ("SZ510300", "159915.SS", "600519"):
+        token = bind_daily_snapshot(code, None)
+        try:
+            assert get_daily_snapshot(code) is None
+        finally:
+            reset_daily_snapshot(token)
+
+
+def test_query_reads_all_revisions_in_one_scan(canonical_store):
+    from etf_quant.data.repositories.market_repository import ParquetMarketRepository
+    root, _repository, _bar = canonical_store
+    with patch.object(ParquetMarketRepository, "get_bar_revisions", side_effect=AssertionError("per-day scan")):
+        result = _query(root)
+    assert Decimal(result["bars"][0]["close"]) == Decimal("4")
+
+
+def test_content_hash_is_stable_across_query_times(canonical_store):
+    root, _repository, _bar = canonical_store
+    first = _query(root, as_of=datetime(2019, 1, 3, tzinfo=UTC))
+    second = _query(root, as_of=datetime(2019, 1, 4, tzinfo=UTC))
+    assert first["bars"] == second["bars"]
+    assert first["provenance"]["dataset_snapshot_id"] != second["provenance"]["dataset_snapshot_id"]
+    assert first["provenance"]["content_hash"] == second["provenance"]["content_hash"]
+
+
+def _bar_row(trade_date, open_, close):
+    return {
+        "trade_date": trade_date, "open": str(open_), "high": str(max(open_, close)),
+        "low": str(min(open_, close)), "close": str(close), "volume": 100, "turnover": "400",
+    }
+
+
+def _mock_reader(rows, discontinuities=None):
+    from src.services.personal_quant import detect_price_discontinuities
+    reader = Mock()
+    reader.query.return_value = {
+        "bars": rows,
+        "metadata": {"status": "UNAVAILABLE"},
+        "provenance": {
+            "mode": "system_replay", "dataset_snapshot_id": "sha256:x",
+            "last_trade_date": rows[-1]["trade_date"],
+            "price_discontinuities": detect_price_discontinuities(rows)
+            if discontinuities is None else discontinuities,
+        },
+    }
+    return reader
+
+
+def test_share_conversion_gap_is_detected_and_window_starts_after_it(tmp_path):
+    from data_provider.personal_quant_fetcher import PersonalQuantFetcher
+    rows = [
+        _bar_row("2026-01-05", 4.0, 4.0), _bar_row("2026-01-06", 4.0, 4.1),
+        # 2:1 share conversion: unadjusted open halves overnight.
+        _bar_row("2026-01-07", 2.05, 2.06), _bar_row("2026-01-08", 2.06, 2.07),
+    ]
+    fetcher = PersonalQuantFetcher(PersonalQuantOptions(tmp_path), reader=_mock_reader(rows))
+    frame = fetcher.get_daily_data("510300", start_date="2026-01-01", end_date="2026-01-08")
+    provenance = frame.attrs["personal_quant"]
+    assert [item["trade_date"] for item in provenance["price_discontinuities"]] == ["2026-01-07"]
+    assert provenance["analysis_window_start"] == "2026-01-07"
+    assert len(frame) == 2
+    assert frame["ma5"].max() < 2.1
+    context = frame_analysis_context("510300", frame)
+    assert "公司行动" in context["price_adjustment_note"]
+
+
+def test_normal_limit_move_is_not_a_discontinuity():
+    from src.services.personal_quant import detect_price_discontinuities
+    rows = [_bar_row("2026-01-05", 1.0, 1.0), _bar_row("2026-01-06", 1.2, 1.2)]
+    assert detect_price_discontinuities(rows) == []
+
+
+def test_current_view_rejects_stale_local_bars(tmp_path):
+    from data_provider.base import DataFetchError
+    from data_provider.personal_quant_fetcher import PersonalQuantFetcher
+    rows = [_bar_row("2026-01-05", 4.0, 4.0), _bar_row("2026-01-06", 4.0, 4.0)]
+    fetcher = PersonalQuantFetcher(PersonalQuantOptions(tmp_path), reader=_mock_reader(rows))
+    weekdays = lambda _market, day: day.weekday() < 5  # noqa: E731
+    with patch("src.core.trading_calendar.get_effective_trading_date", return_value=date(2026, 1, 9)), \
+            patch("src.core.trading_calendar.is_market_open", side_effect=weekdays):
+        with pytest.raises(DataFetchError, match="3 trading session"):
+            fetcher.get_daily_data("510300")
+        relaxed = PersonalQuantFetcher(
+            PersonalQuantOptions(tmp_path, max_stale_sessions=3), reader=_mock_reader(rows),
+        )
+        frame = relaxed.get_daily_data("510300")
+    assert frame.attrs["personal_quant"]["missing_sessions"] == 3
+    assert frame.attrs["personal_quant"]["expected_trade_date"] == "2026-01-09"
+
+
+def test_explicit_historical_range_skips_freshness_check(tmp_path):
+    from data_provider.personal_quant_fetcher import PersonalQuantFetcher
+    rows = [_bar_row("2020-01-06", 4.0, 4.0)]
+    fetcher = PersonalQuantFetcher(PersonalQuantOptions(tmp_path), reader=_mock_reader(rows))
+    with patch("src.core.trading_calendar.get_effective_trading_date") as expected:
+        fetcher.get_daily_data("510300", start_date="2020-01-01", end_date="2020-01-06")
+    expected.assert_not_called()
+
+
+def test_legacy_fallback_success_is_counted_for_canonical_codes():
+    import threading
+    from src.core.pipeline import StockAnalysisPipeline
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline._canonical_fetch_success = set()
+    pipeline._canonical_fetch_lock = threading.Lock()
+    pipeline.fetcher_manager = Mock()
+    pipeline.fetcher_manager.uses_personal_quant.return_value = True
+    pipeline.fetcher_manager.get_daily_data.return_value = pd.DataFrame({"close": [4.0]}), "LegacyFetcher"
+    pipeline.db = Mock()
+    pipeline.db.save_daily_data.return_value = 1
+    with patch.object(pipeline, "_resolve_resume_target_date", return_value=date(2026, 1, 2)):
+        assert pipeline.fetch_and_save_stock_data("510300") == (True, None)
+    assert "510300" in pipeline._canonical_fetch_success
+
+
+def test_options_read_stale_session_limit_from_config(tmp_path):
+    config = SimpleNamespace(
+        personal_quant_canonical_dir=str(tmp_path), personal_quant_metadata_policy=None,
+        personal_quant_allow_fallback=False, personal_quant_max_stale_sessions=4,
+    )
+    assert PersonalQuantOptions.from_config(config).max_stale_sessions == 4

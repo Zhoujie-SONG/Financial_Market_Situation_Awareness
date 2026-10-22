@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [测试] 增加只读 PIT bridge、revision/cutoff、默认失败边界、缓存隔离和行业聚合回归；默认 pytest 只收集 tests/ 并排除 network。
 - [文档] 重写中英文与繁体 README，补回可提交的 .env.example，新增接入/部署/回退说明。
 - [修复] 保持旧 CLI 调用缺省 stock 模式，静态 JS/CSS 响应使用跨平台一致的 MIME，SQLite 并发测试先释放连接再清理临时目录。
+- [修复] personal-quant 当前视图在本地日线落后超过 `PERSONAL_QUANT_MAX_STALE_SESSIONS` 个交易日时按读取失败处理，不再把旧 K 线当作当日行情。
+- [修复] canonical 不复权日线检测份额折算等公司行动跳空，分析窗口从最近一次跳空开始；报告 prompt 注明日线截止日与复权口径。
+- [修复] 未启用桥接时，交易所前后缀不一致的代码不再在快照绑定阶段抛异常。
+- [改进] canonical 修订版本按日期范围单次读取；provenance 新增与查询时间无关的 `content_hash`；canonical 趋势分析窗口与旧路径一致并补充均线形态；显式 fallback 成功计入运行统计；personal-quant 配置项加入 Web 设置页。
+- [文档] README（简中/繁中/英文）补充免责声明与复权、数据过期说明；issue 模板、贡献指南、完整指南中的 issue 与 clone 链接改为本仓库，注明上游 Docker 镜像不含本项目改动；CODEOWNERS 改为本仓库维护者。
+- [修复] 恢复 `scripts/*.sh` 的可执行权限，CI backend-gate 不再因 exit 126 失败。
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->

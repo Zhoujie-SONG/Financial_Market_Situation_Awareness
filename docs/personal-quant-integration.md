@@ -31,6 +31,7 @@ python -X utf8 -m pip install -r requirements-personal-quant.txt
 | `PERSONAL_QUANT_CANONICAL_DIR` | 空，关闭 | 已存在的 canonical 根目录，内部包含 `market_bars/` 和可选 `instrument_metadata.sqlite3` |
 | `PERSONAL_QUANT_METADATA_POLICY` | 空 | personal-quant 的 `configs/metadata_resolution.yaml` 绝对路径 |
 | `PERSONAL_QUANT_ALLOW_FALLBACK` | `false` | canonical 日线失败时，是否允许旧在线 provider 链 |
+| `PERSONAL_QUANT_MAX_STALE_SESSIONS` | `1` | 当前视图下，本地最新 K 线最多可落后最近已收盘交易日几个交易日；超过即视为读取失败 |
 
 配置可放在本项目 `.env` 或进程环境中。桥接不需要 Longbridge 凭证，不加载 personal-quant 的 `.env`。原 Longbridge 线上适配器仍使用它自己的凭证配置。
 
@@ -51,11 +52,23 @@ cutoff 在 revision selection **之前**生效。T2 修订晚于 cutoff 时，�
 
 `HISTORICAL_LATEST` 表示今天取得的历史最新值，不等于 provider historical vintage。导出保留 `historical_data_semantics`。`dataset_snapshot_id` 是 query contract、选中 observations 和解析后元数据的 SHA-256，配合输出 JSON 可审计本次数据集；它不是源文件的物理备份。
 
-桥接不自动更新数据。本地数据可能落后于查询时点，实际日期范围和 row_count 应结合 bars 检查；使用前应在 personal-quant 完成增量 ingestion。空结果不被零值或 forward-fill 掩盖。
+桥接不自动更新数据。应用的当前视图会用交易日历计算最近已收盘交易日（`expected_trade_date`），本地最新 K 线落后超过 `PERSONAL_QUANT_MAX_STALE_SESSIONS` 个交易日时按读取失败处理：默认停止分析，开启 fallback 时改走旧在线链路。provenance 记录 `expected_trade_date` 与 `missing_sessions`。导出 CLI 和显式指定 `end_date` 的历史查询不做此检查。空结果不被零值或 forward-fill 掩盖。
+
+`dataset_snapshot_id` 绑定查询条件（含 as_of），每次查询都不同，用于审计“这次查询”；`content_hash` 只对选中的 observations 和解析后元数据求哈希，用于判断两次分析是否使用同一份数据。
+
+## 复权口径
+
+canonical 日线为**不复权**价格（`adjust_type: none`、`dividend_adjusted: false`），旧在线链路的 ETF 日线为前复权。两者在除息日附近不可直接比较：
+
+- 分红通常只造成 1%–3% 的跳空，桥接无法识别，均线会有对应幅度的偏差。
+- 份额折算等公司行动造成的跳空超过任何内地 ETF 的涨跌幅限制（检测阈值 21%），会记录在 `price_discontinuities`，应用分析只使用最近一次跳空之后的 K 线（`analysis_window_start`），避免新旧价格尺度混算均线。
+- 报告 prompt 中会注明日线截止日和不复权口径。
+
+彻底解决需要 personal-quant 入库复权因子；在此之前，对复权敏感的研究请使用导出数据自行处理。
 
 ## 应用与缓存隔离
 
-应用只自动使用当前时点的 `SYSTEM_REPLAY` 视图。canonical 数据在 worker 中通过 ContextVar 绑定，技术分析和 Agent history tools 使用同一 observation 集，不再从 `stock_daily` 取另一版本。请求结束恢复上下文，避免并发标的相互污染。
+应用只自动使用当前时点的 `SYSTEM_REPLAY` 视图。修订版本按日期范围一次读取，不再逐日扫描 Parquet。canonical 数据在 worker 中通过 ContextVar 绑定，技术分析和 Agent history tools 使用同一 observation 集，不再从 `stock_daily` 取另一版本。请求结束恢复上下文，避免并发标的相互污染。
 
 canonical 输入不写入本项目 mutable 日线缓存；报告和新闻仍存入现有应用数据库。Agent 初始上下文、行业精简摘要和 `AnalysisResult.market_snapshot` 带 provenance。`data_sources` 追加 source 与 snapshot id，并通过 `to_dict()` 导出。API 变化为已有对象中的追加信息，无字段删除或枚举变更。
 
@@ -89,6 +102,6 @@ GitHub Actions 读取真实 canonical 文件时需使用可访问该数据的 ru
 
 ## 验证范围
 
-离线 fixtures 覆盖：晚下载历史的两种 PIT 模式、cutoff 前修订恢复、同时间冲突、快照稳定性、Decimal、源目录只读、metadata UNKNOWN/SQLite 只读、默认 fail-closed/显式 fallback、缓存隔离、Agent 绑定快照、代码边界、行业评分与 delay。
+离线 fixtures 覆盖：晚下载历史的两种 PIT 模式、cutoff 前修订恢复、同时间冲突、快照稳定性、Decimal、源目录只读、metadata UNKNOWN/SQLite 只读、默认 fail-closed/显式 fallback、缓存隔离、Agent 绑定快照、代码边界、行业评分与 delay、数据过期拦截、公司行动跳空截断、content_hash 稳定性、单次范围扫描、关闭桥接时的代码容错。
 
 真实行情刷新、LLM 服务、通知和 Docker/桌面发布需要各自环境。本次接入测试不发送通知或下单。

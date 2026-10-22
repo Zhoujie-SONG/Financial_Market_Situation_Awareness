@@ -1900,7 +1900,12 @@ class GeminiAnalyzer:
 | MA20 | {today.get('ma20', 'N/A')} | 中期趋势线 |
 | 均线形态 | {context.get('ma_status', unknown_text)} | 多头/空头/缠绕 |
 """
-        
+        # personal-quant canonical 日线：说明数据截止日与复权口径（旧路径无这些字段，不输出）
+        if context.get('price_adjustment_note'):
+            prompt += f"""
+> 日线数据截至 {context.get('daily_bar_as_of', unknown_text)}。{context['price_adjustment_note']}
+"""
+
         # 添加实时行情数据（量比、换手率等）
         if 'realtime' in context:
             rt = context['realtime']
