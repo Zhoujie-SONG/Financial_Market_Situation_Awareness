@@ -244,6 +244,13 @@ class StockAnalysisPipeline:
             saved_count = self.db.save_daily_data(df, code, source_name)
             logger.info(f"{stock_name}({code}) 数据保存成功（来源: {source_name}，新增 {saved_count} 条）")
 
+            if canonical_enabled:
+                # Explicit legacy fallback succeeded; count it as a successful fetch.
+                lock = getattr(self, "_canonical_fetch_lock", None)
+                if lock is not None:
+                    with lock:
+                        self._canonical_fetch_success.add(code)
+
             return True, None
 
         except Exception as e:
@@ -371,7 +378,12 @@ class StockAnalysisPipeline:
                 canonical_frame = get_daily_snapshot(code)
                 historical_bars = [] if canonical_frame is not None else self.db.get_data_range(code, start_date, end_date)
                 if canonical_frame is not None or historical_bars:
-                    df = canonical_frame.copy() if canonical_frame is not None else pd.DataFrame([bar.to_dict() for bar in historical_bars])
+                    if canonical_frame is not None:
+                        # Same calendar window as the legacy DB path, so trend results stay comparable.
+                        in_window = pd.to_datetime(canonical_frame["date"]).dt.date >= start_date
+                        df = canonical_frame.loc[in_window].copy()
+                    else:
+                        df = pd.DataFrame([bar.to_dict() for bar in historical_bars])
                     # Issue #234: Augment with realtime for intraday MA calculation
                     if self.config.enable_realtime_quote and realtime_quote:
                         df = self._augment_historical_with_realtime(df, realtime_quote, code)
@@ -451,10 +463,17 @@ class StockAnalysisPipeline:
             # Step 5: 获取分析上下文（技术面数据）
             self._emit_progress(58, f"{stock_name}：正在整理分析上下文")
             canonical_frame = get_daily_snapshot(code)
-            context = (
-                frame_analysis_context(code, canonical_frame)
-                if canonical_frame is not None else self.db.get_analysis_context(code)
-            )
+            if canonical_frame is not None:
+                context = frame_analysis_context(code, canonical_frame)
+                latest_bar = context["today"]
+                if context.get("yesterday"):
+                    # Mirror storage.get_analysis_context, which adds ma_status when two bars exist.
+                    context["ma_status"] = self._compute_ma_status(
+                        latest_bar.get("close"), latest_bar.get("ma5"),
+                        latest_bar.get("ma10"), latest_bar.get("ma20"),
+                    )
+            else:
+                context = self.db.get_analysis_context(code)
 
             if context is None:
                 logger.warning(f"{stock_name}({code}) 无法获取历史行情数据，将仅基于新闻和实时行情分析")

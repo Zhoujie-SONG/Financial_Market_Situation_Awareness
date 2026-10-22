@@ -65,11 +65,90 @@ def _json_safe(value: Any) -> Any:
     return json.loads(json.dumps(value, default=_json_default, ensure_ascii=False, allow_nan=False))
 
 
+# Mainland ETF daily limits are 10% or 20%. An open-to-previous-close move beyond
+# this bound cannot be a normal trading move and indicates a share conversion or
+# other corporate action in unadjusted prices.
+PRICE_DISCONTINUITY_THRESHOLD = 0.21
+
+_RANGE_REVISION_HELPERS = ("_files", "_require_current_schema", "_parquet_glob", "_fetchall", "_bar_from_tuple")
+
+
+def _revisions_by_day(repository: Any, symbol: str, start_date: date, end_date: date, days: list) -> dict:
+    """Load all revisions in the range with one scan instead of one scan per day.
+
+    Uses the pinned upstream repository helpers; falls back to the public per-day
+    API if an upstream version no longer exposes them.
+    """
+    if all(hasattr(repository, name) for name in _RANGE_REVISION_HELPERS):
+        from etf_quant.data.repositories import market_repository as upstream
+
+        files = repository._files()
+        if not files:
+            return {}
+        repository._require_current_schema(files)
+        sql = f"""
+            SELECT observation_id, value_hash, availability_policy_id,
+                   symbol, trade_date, open, high, low, close, volume, turnover,
+                   data_time, available_time, ingest_time, source,
+                   availability_policy_id, historical_data_semantics
+            FROM read_parquet('{repository._parquet_glob()}', hive_partitioning = false)
+            WHERE symbol = ? AND source = ? AND trade_date BETWEEN ? AND ?
+            ORDER BY trade_date, ingest_time, availability_policy_id, value_hash
+        """
+        grouped: dict = {}
+        for row in repository._fetchall(sql, [symbol, "longbridge", start_date, end_date]):
+            observation = upstream.MarketBarObservation(
+                observation_id=str(row[0]),
+                value_hash=str(row[1]),
+                availability_policy_id=str(row[2]),
+                observed_at=upstream._aware_utc(row[13]),
+                bar=repository._bar_from_tuple(row[3:]),
+            )
+            grouped.setdefault(observation.bar.trade_date, []).append(observation)
+        return grouped
+    return {
+        day.trade_date: repository.get_bar_revisions(symbol, day.trade_date, "longbridge")
+        for day in days
+    }
+
+
+def detect_price_discontinuities(rows: list) -> list:
+    """Return days whose open gaps beyond any ETF price limit versus the prior close."""
+    breaks = []
+    for previous, current in zip(rows, rows[1:]):
+        prev_close = float(previous["close"])
+        open_price = float(current["open"])
+        if prev_close <= 0:
+            continue
+        ratio = open_price / prev_close - 1
+        if abs(ratio) > PRICE_DISCONTINUITY_THRESHOLD:
+            breaks.append({
+                "trade_date": current["trade_date"],
+                "previous_close": previous["close"],
+                "open": current["open"],
+                "gap_ratio": round(ratio, 4),
+            })
+    return breaks
+
+
+def count_missing_sessions(last_trade_date: date, expected_date: date, is_session) -> int:
+    """Number of trading sessions after last_trade_date up to expected_date."""
+    missing = 0
+    day = last_trade_date
+    while day < expected_date:
+        day = date.fromordinal(day.toordinal() + 1)
+        if is_session(day):
+            missing += 1
+    return missing
+
+
 @dataclass(frozen=True)
 class PersonalQuantOptions:
     canonical_dir: Path
     metadata_policy: Optional[Path] = None
     allow_fallback: bool = False
+    # Trading sessions the latest local bar may lag the latest closed session.
+    max_stale_sessions: int = 1
 
     @classmethod
     def from_config(cls, config: Any) -> Optional["PersonalQuantOptions"]:
@@ -81,6 +160,7 @@ class PersonalQuantOptions:
             canonical_dir=Path(root).expanduser().resolve(),
             metadata_policy=Path(policy).expanduser().resolve() if policy else None,
             allow_fallback=getattr(config, "personal_quant_allow_fallback", False) is True,
+            max_stale_sessions=max(0, int(getattr(config, "personal_quant_max_stale_sessions", 1))),
         )
 
 
@@ -126,9 +206,10 @@ class PersonalQuantReader:
             canonical_symbol, start_date, end_date,
             source=CanonicalMarketSource.LONGBRIDGE, as_of=as_of, mode=query_mode,
         )
+        revisions_by_day = _revisions_by_day(repository, canonical_symbol, start_date, end_date, days)
         selected = []
         for day in days:
-            revisions = repository.get_bar_revisions(canonical_symbol, day.trade_date, "longbridge")
+            revisions = revisions_by_day.get(day.trade_date, [])
             eligible = [
                 item for item in revisions
                 if item.bar.available_time <= as_of
@@ -165,12 +246,23 @@ class PersonalQuantReader:
             "first_trade_date": rows[0]["trade_date"] if rows else None,
             "last_trade_date": rows[-1]["trade_date"] if rows else None,
             "metadata_status": metadata["status"],
+            # Canonical bars are unadjusted. Distributions are not back-adjusted; gaps
+            # beyond any mainland ETF price limit are reported as corporate-action breaks.
+            "dividend_adjusted": False,
+            "price_discontinuities": detect_price_discontinuities(rows),
         }
         identity = json.dumps(
             {"provenance": provenance, "bars": rows, "metadata": metadata},
             ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False,
         )
         provenance["dataset_snapshot_id"] = "sha256:" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+        # content_hash ignores query time and parameters, so identical observations
+        # produce the same value across runs.
+        content = json.dumps(
+            {"bars": rows, "metadata": metadata},
+            ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False,
+        )
+        provenance["content_hash"] = "sha256:" + hashlib.sha256(content.encode("utf-8")).hexdigest()
         return {"provenance": provenance, "bars": rows, "metadata": metadata}
 
     def _metadata(self, symbol: str, as_of: datetime, mode: Any, cutoff: datetime) -> dict:
@@ -209,8 +301,20 @@ class PersonalQuantReader:
 _daily_snapshot: ContextVar[Optional[tuple[str, Any]]] = ContextVar("personal_quant_daily_snapshot", default=None)
 
 
+def _snapshot_key(code: str) -> Optional[str]:
+    """Snapshot key for ETFs; any other or malformed code never matches a snapshot.
+
+    Exchange mismatches fail fast inside the fetcher when the bridge is enabled.
+    Binding must not raise here, so the legacy path is unaffected when it is off.
+    """
+    try:
+        return canonical_etf_symbol(code)
+    except PersonalQuantError:
+        return None
+
+
 def bind_daily_snapshot(code: str, frame: Any):
-    return _daily_snapshot.set((canonical_etf_symbol(code) or code, frame))
+    return _daily_snapshot.set((_snapshot_key(code), frame))
 
 
 def reset_daily_snapshot(token) -> None:
@@ -219,7 +323,8 @@ def reset_daily_snapshot(token) -> None:
 
 def get_daily_snapshot(code: str):
     current = _daily_snapshot.get()
-    if current is None or current[0] != canonical_etf_symbol(code):
+    key = _snapshot_key(code)
+    if current is None or key is None or current[0] != key:
         return None
     return current[1]
 
@@ -237,10 +342,17 @@ def frame_analysis_context(code: str, frame: Any) -> dict:
 
     latest = row_payload(frame.iloc[-1])
     previous = row_payload(frame.iloc[-2]) if len(frame) > 1 else {}
+    provenance = frame.attrs["personal_quant"]
     context = {
         "code": code, "date": latest["date"], "today": latest, "yesterday": previous,
-        "data_provenance": frame.attrs["personal_quant"],
+        "data_provenance": provenance,
         "resolved_etf_metadata": frame.attrs.get("resolved_etf_metadata", {}),
+        # The latest bar can be older than the analysis date; state it explicitly.
+        "daily_bar_as_of": latest["date"],
+        "price_adjustment_note": (
+            "日线为不复权价格；分红未调整。"
+            + ("检测到公司行动跳空，均线仅使用跳空之后的K线。" if provenance.get("analysis_window_start") else "")
+        ),
     }
     if previous.get("volume"):
         context["volume_change_ratio"] = round(latest["volume"] / previous["volume"], 2)
